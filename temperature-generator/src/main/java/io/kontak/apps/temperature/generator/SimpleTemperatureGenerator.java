@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -20,6 +21,12 @@ public class SimpleTemperatureGenerator implements TemperatureGenerator {
             "thermometer-3"
     );
 
+    private final Map<String, String> roomsByThermometer = Map.of(
+            "thermometer-1", "room-A",
+            "thermometer-2", "room-B",
+            "thermometer-3", "room-B"
+    );
+
     @Override
     public List<TemperatureReading> generate() {
         return List.of(generateSingleReading());
@@ -27,11 +34,13 @@ public class SimpleTemperatureGenerator implements TemperatureGenerator {
 
     private TemperatureReading generateSingleReading() {
         //TODO basic implementation, should be changed to the one that will allow to test and demo solution on realistic data
+        String thermometerId = thermometerIds.get(random.nextInt(3));
         return new TemperatureReading(
                 random.nextDouble(10d, 30d),
-                UUID.randomUUID().toString(),
 //                UUID.randomUUID().toString(),
-                thermometerIds.get(random.nextInt(3)),
+//                UUID.randomUUID().toString(),
+                roomsByThermometer.get(thermometerId),
+                thermometerId,
                 Instant.now()
         );
     }

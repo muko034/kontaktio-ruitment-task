@@ -30,6 +30,7 @@
 		<maven.compiler.target>17</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<testcontainers.version>1.18.1</testcontainers.version>
+		<spring-boot.version>2.7.10</spring-boot.version>
 	</properties>
 
 	<dependencyManagement>
@@ -40,6 +41,19 @@
 				<artifactId>temperature-domain</artifactId>
 				<version>0.0.1-SNAPSHOT</version>
 			</dependency>
+			<dependency>
+				<groupId>io.kontak.apps</groupId>
+				<artifactId>temperature-analytics-api</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+			</dependency>
+
+<!--			<dependency>-->
+<!--				<groupId>org.springframework.boot</groupId>-->
+<!--				<artifactId>spring-boot-dependencies</artifactId>-->
+<!--				<version>${spring-boot.version}</version>-->
+<!--				<type>pom</type>-->
+<!--				<scope>import</scope>-->
+<!--			</dependency>-->
 
 			<dependency>
 				<groupId>org.springframework.boot</groupId>

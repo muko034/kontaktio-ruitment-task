@@ -2,8 +2,8 @@ package io.kontak.apps.anomaly.detector.config;
 
 import io.kontak.apps.anomaly.detector.AlwaysAnomalyAnomalyDetector;
 import io.kontak.apps.anomaly.detector.AnomalyDetector;
-import io.kontak.apps.anomaly.detector.MeasurementsWindowAnomalyAnomalyDetector;
-import io.kontak.apps.anomaly.detector.TimeWindowAnomalyAnomalyDetector;
+import io.kontak.apps.anomaly.detector.CountWindowAnomalyDetector;
+import io.kontak.apps.anomaly.detector.TimeWindowAnomalyDetector;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,16 +28,16 @@ public class AnomalyDetectorConfig {
             havingValue = "timeWindow"
     )
     public AnomalyDetector timeWindowAnomalyAnomalyDetector() {
-        return new TimeWindowAnomalyAnomalyDetector();
+        return new TimeWindowAnomalyDetector();
     }
 
     @Bean
     @ConditionalOnProperty(
             prefix = "io.kontak.apps.anomaly.detector",
             name = "algorithm",
-            havingValue = "measurementsWindow"
+            havingValue = "countWindow"
     )
-    public AnomalyDetector measurementsWindowAnomalyAnomalyDetector() {
-        return new MeasurementsWindowAnomalyAnomalyDetector();
+    public AnomalyDetector countWindowAnomalyAnomalyDetector() {
+        return new CountWindowAnomalyDetector();
     }
 }

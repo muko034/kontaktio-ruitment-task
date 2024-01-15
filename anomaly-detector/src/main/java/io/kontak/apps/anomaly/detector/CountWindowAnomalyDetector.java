@@ -9,9 +9,13 @@ import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.support.serializer.JsonSerde;
 
 public class CountWindowAnomalyDetector implements AnomalyDetector {
+
+    private static final Logger logger = LoggerFactory.getLogger(CountWindowAnomalyDetector.class);
 
     private final double temperatureThreshold;
     private final  int countWindowLimit;
@@ -37,6 +41,10 @@ public class CountWindowAnomalyDetector implements AnomalyDetector {
                                 .withKeySerde(keySerde)
                                 .withValueSerde(temperatureAggregateJsonSerde)
                 )
+                .mapValues((key, aggregate) -> {
+                    logger.info(String.format("Avg: %s, Aggregate: %s", aggregate.avgTemperatureAggregate().getAverage(), aggregate));
+                    return aggregate;
+                })
                 .filter((key, aggregate) -> aggregate.isTemperatureHigherThenAverageBy(temperatureThreshold))
                 .mapValues((key, aggregate) -> {
                     TemperatureReading temperatureReading = aggregate.avgTemperatureAggregate().temperatureReading();

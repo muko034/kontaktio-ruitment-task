@@ -52,6 +52,7 @@ public abstract class AbstractAnomalyDetectorTest {
         // Properties
         streamsProps = new Properties();
         streamsProps.put(StreamsConfig.APPLICATION_ID_CONFIG, "aggregate-test");
+        streamsProps.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, stringSerde.getClass());
         streamsProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         streamsProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         streamsProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);

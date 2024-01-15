@@ -34,31 +34,35 @@ public class TimeWindowAnomalyDetector implements AnomalyDetector {
     @Override
     public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) {
         JsonSerde<TemperatureReading> temperatureReadingJsonSerde = new JsonSerde<>(TemperatureReading.class);
-        JsonSerde<AvgTemperatureAggregate> temperatureAggregateJsonSerde = new JsonSerde<>(AvgTemperatureAggregate.class);
+        JsonSerde<AvgTemperatureAggregate2> temperatureAggregateJsonSerde = new JsonSerde<>(AvgTemperatureAggregate2.class);
         Serde<String> keySerde = Serdes.String();
         return events
                 .groupByKey(Grouped.with(keySerde, temperatureReadingJsonSerde))
                 .windowedBy(SlidingWindows.ofTimeDifferenceAndGrace(timeWindowDifference, timeWindowGrace))
                 .aggregate(
-                        AvgTemperatureAggregate::empty,
+                        AvgTemperatureAggregate2::empty,
                         (key, temperatureReading, avgTemperatureAggregate) -> avgTemperatureAggregate.add(temperatureReading),
-                        Materialized.<String, AvgTemperatureAggregate, WindowStore<Bytes, byte[]>>as(
+                        Materialized.<String, AvgTemperatureAggregate2, WindowStore<Bytes, byte[]>>as(
                                         "time-window-temperature-aggregate-store"
                                 )
                                 .withKeySerde(keySerde)
                                 .withValueSerde(temperatureAggregateJsonSerde)
                 )
-                .filter((windowed, aggregate) -> aggregate.isTemperatureHigherThenAverageBy(temperatureThreshold))
-                .mapValues((windowed, aggregate) -> {
-                    TemperatureReading temperatureReading = aggregate.temperatureReading();
-                    return new Anomaly(
-                            temperatureReading.temperature(),
-                            temperatureReading.roomId(),
-                            temperatureReading.thermometerId(),
-                            temperatureReading.timestamp()
-                    );
+                .mapValues((key, aggregate) -> {
+                    logger.info(String.format("Count: %s, Avg: %s, Aggregate: %s", aggregate.readings().size() + 1, aggregate.getAverage(), aggregate));
+                    return aggregate;
                 })
+
+                .filter((windowed, aggregate) -> aggregate.anyTemperatureHigherThenAverageBy(temperatureThreshold))
                 .toStream()
+                .filter((windowed, aggregate) -> aggregate != null)
+                .flatMapValues((windowed, aggregate) -> aggregate.getTemperaturesHigherThenAverageBy(temperatureThreshold))
+                .mapValues((windowed, temperatureReading) -> new Anomaly(
+                        temperatureReading.temperature(),
+                        temperatureReading.roomId(),
+                        temperatureReading.thermometerId(),
+                        temperatureReading.timestamp()
+                ))
                 .map((windowed, anomaly) -> new KeyValue<>(windowed.key(), anomaly))
                 .filter((key, anomaly) -> anomaly != null);
     }

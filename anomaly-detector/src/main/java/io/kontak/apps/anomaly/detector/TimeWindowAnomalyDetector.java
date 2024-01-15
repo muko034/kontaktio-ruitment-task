@@ -59,6 +59,7 @@ public class TimeWindowAnomalyDetector implements AnomalyDetector {
                     );
                 })
                 .toStream()
-                .map((windowed, anomaly) -> new KeyValue<>(windowed.key(), anomaly));
+                .map((windowed, anomaly) -> new KeyValue<>(windowed.key(), anomaly))
+                .filter((key, anomaly) -> anomaly != null);
     }
 }

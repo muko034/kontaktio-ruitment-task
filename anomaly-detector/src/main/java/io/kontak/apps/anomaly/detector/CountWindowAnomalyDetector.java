@@ -13,6 +13,14 @@ import org.springframework.kafka.support.serializer.JsonSerde;
 
 public class CountWindowAnomalyDetector implements AnomalyDetector {
 
+    private final double temperatureThreshold;
+    private final  int countWindowLimit;
+
+    public CountWindowAnomalyDetector(double temperatureThreshold, int countWindowLimit) {
+        this.temperatureThreshold = temperatureThreshold;
+        this.countWindowLimit = countWindowLimit;
+    }
+
     @Override
     public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) {
         JsonSerde<TemperatureReading> temperatureReadingJsonSerde = new JsonSerde<>(TemperatureReading.class);
@@ -21,7 +29,7 @@ public class CountWindowAnomalyDetector implements AnomalyDetector {
         return events
                 .groupByKey(Grouped.with(keySerde, temperatureReadingJsonSerde))
                 .aggregate(
-                        () -> CountLimitedTemperatureAggregate.empty(10),
+                        () -> CountLimitedTemperatureAggregate.empty(countWindowLimit),
                         (key, temperatureReading, aggregate) -> aggregate.add(temperatureReading),
                         Materialized.<String, CountLimitedTemperatureAggregate, KeyValueStore<Bytes, byte[]>>as(
                                         "count-window-temperature-aggregate-store"
@@ -29,8 +37,8 @@ public class CountWindowAnomalyDetector implements AnomalyDetector {
                                 .withKeySerde(keySerde)
                                 .withValueSerde(temperatureAggregateJsonSerde)
                 )
-                .filter((key, aggregate) -> aggregate.isTemperatureHigherThenAverageBy(5.0))
-                .mapValues((s, aggregate) -> {
+                .filter((key, aggregate) -> aggregate.isTemperatureHigherThenAverageBy(temperatureThreshold))
+                .mapValues((key, aggregate) -> {
                     TemperatureReading temperatureReading = aggregate.avgTemperatureAggregate().temperatureReading();
                     return new Anomaly(
                             temperatureReading.temperature(),

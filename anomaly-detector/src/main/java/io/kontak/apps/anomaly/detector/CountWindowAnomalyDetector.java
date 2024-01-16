@@ -26,7 +26,7 @@ public class CountWindowAnomalyDetector implements AnomalyDetector {
     }
 
     @Override
-    public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) {
+    public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) { // FIXME doesn't work as expected
         JsonSerde<TemperatureReading> temperatureReadingJsonSerde = new JsonSerde<>(TemperatureReading.class);
         JsonSerde<CountLimitedTemperatureAggregate> temperatureAggregateJsonSerde = new JsonSerde<>(CountLimitedTemperatureAggregate.class);
         Serde<String> keySerde = Serdes.String();

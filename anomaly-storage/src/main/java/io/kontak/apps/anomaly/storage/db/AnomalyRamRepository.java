@@ -14,7 +14,7 @@ import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
 @Component
-public class AnomalyRamRepository implements AnomalyRepository, AnomalyQueries {
+public class AnomalyRamRepository implements AnomalyRepository, AnomalyQueries { // TODO add real DB implementation e.g. MongoDB
 
     private final Collection<Anomaly> store = new ConcurrentLinkedQueue<>();
 

@@ -7,11 +7,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
 
 @Component
-public class SimpleTemperatureGenerator implements TemperatureGenerator {
+public class SimpleTemperatureGenerator implements TemperatureGenerator { // TODO add REST generator
 
     private final Random random = new Random();
 
@@ -37,8 +35,6 @@ public class SimpleTemperatureGenerator implements TemperatureGenerator {
         String thermometerId = thermometerIds.get(random.nextInt(3));
         return new TemperatureReading(
                 random.nextDouble(10d, 30d),
-//                UUID.randomUUID().toString(),
-//                UUID.randomUUID().toString(),
                 roomsByThermometer.get(thermometerId),
                 thermometerId,
                 Instant.now()

@@ -66,7 +66,7 @@ public class TimeWindowAnomalyDetector implements AnomalyDetector {
                 .leftJoin(
                         averageTemperatures,
                         (temperatureReading, averageTemperature) -> {
-                            if (temperatureReading.temperature() > averageTemperature + temperatureThreshold) {
+                            if (averageTemperature != null && temperatureReading.temperature() > averageTemperature + temperatureThreshold) {
                                 return new Anomaly(
                                         temperatureReading.temperature(),
                                         temperatureReading.roomId(),

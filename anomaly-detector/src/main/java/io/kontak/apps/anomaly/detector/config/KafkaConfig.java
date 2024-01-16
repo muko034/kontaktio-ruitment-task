@@ -1,6 +1,7 @@
 package io.kontak.apps.anomaly.detector.config;
 
 import io.kontak.apps.anomaly.detector.AnomalyDetector;
+import io.kontak.apps.anomaly.detector.BooleanSerde;
 import io.kontak.apps.anomaly.detector.SumCount;
 import io.kontak.apps.anomaly.detector.TemperatureMeasurementsListener;
 import io.kontak.apps.event.Anomaly;
@@ -24,6 +25,7 @@ public class KafkaConfig {
     public static final JsonSerde<SumCount> sumCountSerde = new JsonSerde<>(SumCount.class);
     public static final Serde<String> stringSerde = Serdes.String();
     public static final Serde<Double> doubleSerde = Serdes.Double();
+    public static final Serde<Boolean> booleanSerde = new BooleanSerde();
     public static final String STATE_STORE_NAME = "anomaly-store";
 
     @Bean
@@ -34,7 +36,7 @@ public class KafkaConfig {
     @Bean
     public StoreBuilder anomalyStore() {
         return Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(STATE_STORE_NAME), anomalySerde, Serdes.String());
+                Stores.persistentKeyValueStore(STATE_STORE_NAME), anomalySerde, booleanSerde);
     }
 
 }

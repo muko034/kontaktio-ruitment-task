@@ -90,7 +90,7 @@ public class TimeWindowAnomalyDetector implements AnomalyDetector {
 }
 
 class AnomalyTransformer implements Transformer<String, Anomaly, KeyValue<String, Anomaly>> {
-    private KeyValueStore<Anomaly, String> anomalyStore;
+    private KeyValueStore<Anomaly, Boolean> anomalyStore;
 
     @SuppressWarnings("unchecked")
     @Override
@@ -102,7 +102,7 @@ class AnomalyTransformer implements Transformer<String, Anomaly, KeyValue<String
     public KeyValue<String, Anomaly> transform(String key, Anomaly anomaly) {
         // Check if anomaly has already been detected for this key
         if (anomaly != null && anomalyStore.get(anomaly) == null) {
-            anomalyStore.put(anomaly, "true");
+            anomalyStore.put(anomaly, true);
             return new KeyValue<>(key, anomaly);
         }
         return null; // Skip the anomaly if already detected

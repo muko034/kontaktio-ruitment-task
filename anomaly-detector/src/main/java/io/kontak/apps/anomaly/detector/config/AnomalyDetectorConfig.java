@@ -22,7 +22,7 @@ public class AnomalyDetectorConfig {
             name = "algorithm",
             havingValue = "always"
     )
-    public AnomalyDetector alwaysAnomalyAnomalyDetector() {
+    public AnomalyDetector alwaysAnomalyDetector() {
         return new AlwaysAnomalyAnomalyDetector();
     }
 
@@ -32,7 +32,7 @@ public class AnomalyDetectorConfig {
             name = "algorithm",
             havingValue = "timeWindow"
     )
-    public AnomalyDetector timeWindowAnomalyAnomalyDetector(
+    public AnomalyDetector timeWindowAnomalyDetector(
             @Value("${io.kontak.apps.anomaly.detector.temperatureThreshold:" + DEFAULT_TEMPERATURE_THRESHOLD + "}")
             double temperatureThreshold,
             @Value("${io.kontak.apps.anomaly.detector.timeWindowDifference:10s}")

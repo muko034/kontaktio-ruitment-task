@@ -1,19 +1,24 @@
 package io.kontak.apps.anomaly.detector;
 
+import io.kontak.apps.anomaly.detector.config.KafkaConfig;
 import io.kontak.apps.event.Anomaly;
 import io.kontak.apps.event.TemperatureReading;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Grouped;
+import org.apache.kafka.streams.kstream.JoinWindows;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.SlidingWindows;
+import org.apache.kafka.streams.kstream.StreamJoined;
+import org.apache.kafka.streams.kstream.Transformer;
+import org.apache.kafka.streams.kstream.WindowedSerdes;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.WindowStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.support.serializer.JsonSerde;
 
 import java.time.Duration;
 
@@ -33,37 +38,78 @@ public class TimeWindowAnomalyDetector implements AnomalyDetector {
 
     @Override
     public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) {
-        JsonSerde<TemperatureReading> temperatureReadingJsonSerde = new JsonSerde<>(TemperatureReading.class);
-        JsonSerde<AvgTemperatureAggregate2> temperatureAggregateJsonSerde = new JsonSerde<>(AvgTemperatureAggregate2.class);
-        Serde<String> keySerde = Serdes.String();
-        return events
-                .groupByKey(Grouped.with(keySerde, temperatureReadingJsonSerde))
-                .windowedBy(SlidingWindows.ofTimeDifferenceAndGrace(timeWindowDifference, timeWindowGrace))
+        SlidingWindows timeSlidingWindows = SlidingWindows.ofTimeDifferenceAndGrace(timeWindowDifference, timeWindowGrace);
+        KStream<String, Double> averageTemperatures = events
+                .groupByKey(Grouped.with(KafkaConfig.stringSerde, KafkaConfig.temperatureReadingSerde))
+                .windowedBy(timeSlidingWindows)
                 .aggregate(
-                        AvgTemperatureAggregate2::empty,
-                        (key, temperatureReading, avgTemperatureAggregate) -> avgTemperatureAggregate.add(temperatureReading),
-                        Materialized.<String, AvgTemperatureAggregate2, WindowStore<Bytes, byte[]>>as(
+                        SumCount::empty,
+                        (key, temperatureReading, aggregate) -> aggregate.add(temperatureReading.temperature()),
+                        Materialized.<String, SumCount, WindowStore<Bytes, byte[]>>as(
                                         "time-window-temperature-aggregate-store"
                                 )
-                                .withKeySerde(keySerde)
-                                .withValueSerde(temperatureAggregateJsonSerde)
+                                .withKeySerde(KafkaConfig.stringSerde)
+                                .withValueSerde(KafkaConfig.sumCountSerde)
                 )
-                .mapValues((key, aggregate) -> {
-                    logger.info(String.format("Count: %s, Avg: %s, Aggregate: %s", aggregate.readings().size() + 1, aggregate.getAverage(), aggregate));
-                    return aggregate;
-                })
-
-                .filter((windowed, aggregate) -> aggregate.anyTemperatureHigherThenAverageBy(temperatureThreshold))
+                .mapValues((key, aggregate) -> aggregate.calcAvg(),
+                        Named.as("time-window-temperature-average-store"),
+                        Materialized.with(
+                                WindowedSerdes.timeWindowedSerdeFrom(
+                                        String.class,
+                                        timeSlidingWindows.timeDifferenceMs()
+                                ),
+                                KafkaConfig.doubleSerde)
+                )
                 .toStream()
-                .filter((windowed, aggregate) -> aggregate != null)
-                .flatMapValues((windowed, aggregate) -> aggregate.getTemperaturesHigherThenAverageBy(temperatureThreshold))
-                .mapValues((windowed, temperatureReading) -> new Anomaly(
-                        temperatureReading.temperature(),
-                        temperatureReading.roomId(),
-                        temperatureReading.thermometerId(),
-                        temperatureReading.timestamp()
-                ))
-                .map((windowed, anomaly) -> new KeyValue<>(windowed.key(), anomaly))
+                .map((key, value) -> new KeyValue<>(key.key(), value));
+        return events
+                .leftJoin(
+                        averageTemperatures,
+                        (temperatureReading, averageTemperature) -> {
+                            if (temperatureReading.temperature() > averageTemperature + temperatureThreshold) {
+                                return new Anomaly(
+                                        temperatureReading.temperature(),
+                                        temperatureReading.roomId(),
+                                        temperatureReading.thermometerId(),
+                                        temperatureReading.timestamp()
+                                );
+                            } else {
+                                return null;
+                            }
+                        },
+                        JoinWindows.ofTimeDifferenceAndGrace(timeWindowDifference, timeWindowGrace),
+                        StreamJoined.with(
+                                KafkaConfig.stringSerde,
+                                KafkaConfig.temperatureReadingSerde,
+                                KafkaConfig.doubleSerde
+                        )
+                )
+                .transform(AnomalyTransformer::new, Named.as("anomaly-transformer"), KafkaConfig.STATE_STORE_NAME)
                 .filter((key, anomaly) -> anomaly != null);
+    }
+}
+
+class AnomalyTransformer implements Transformer<String, Anomaly, KeyValue<String, Anomaly>> {
+    private KeyValueStore<Anomaly, String> anomalyStore;
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void init(ProcessorContext context) {
+        anomalyStore = context.getStateStore(KafkaConfig.STATE_STORE_NAME);
+    }
+
+    @Override
+    public KeyValue<String, Anomaly> transform(String key, Anomaly anomaly) {
+        // Check if anomaly has already been detected for this key
+        if (anomaly != null && anomalyStore.get(anomaly) == null) {
+            anomalyStore.put(anomaly, "true");
+            return new KeyValue<>(key, anomaly);
+        }
+        return null; // Skip the anomaly if already detected
+    }
+
+    @Override
+    public void close() {
+        // No additional cleanup needed
     }
 }

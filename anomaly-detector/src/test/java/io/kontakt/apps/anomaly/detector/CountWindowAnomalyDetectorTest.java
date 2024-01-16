@@ -24,7 +24,7 @@ public class CountWindowAnomalyDetectorTest extends AbstractAnomalyDetectorTest 
     }
 
     @Test
-    public void shouldAggregateRecords() {
+    public void shouldDetectAnomalies() {
         //given
         final String room1 = "room-1";
         final String thermometer1 = "thermometer-1";

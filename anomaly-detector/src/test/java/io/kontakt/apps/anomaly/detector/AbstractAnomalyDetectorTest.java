@@ -1,6 +1,7 @@
 package io.kontakt.apps.anomaly.detector;
 
 import io.kontak.apps.anomaly.detector.AnomalyDetector;
+import io.kontak.apps.anomaly.detector.config.KafkaConfig;
 import io.kontak.apps.event.Anomaly;
 import io.kontak.apps.event.TemperatureReading;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -16,6 +17,7 @@ import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.state.Stores;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
@@ -64,8 +66,14 @@ public abstract class AbstractAnomalyDetectorTest {
         temperatureReadingStream =
                 streamsBuilder.stream(inputTopicName, Consumed.with(stringSerde, temperatureReadingSerde));
 
+        KafkaConfig kafkaConfig = new KafkaConfig();
+
+        streamsBuilder.
+                addStateStore(kafkaConfig.anomalyStore());
+
         anomalyDetector.apply(temperatureReadingStream)
                 .to(outputTopicName, Produced.with(Serdes.String(), anomalySerde));
+
 
         testDriver = new TopologyTestDriver(streamsBuilder.build(), streamsProps);
 

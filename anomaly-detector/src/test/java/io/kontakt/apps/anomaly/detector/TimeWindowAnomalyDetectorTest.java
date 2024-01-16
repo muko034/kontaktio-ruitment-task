@@ -2,7 +2,6 @@ package io.kontakt.apps.anomaly.detector;
 
 import io.kontak.apps.anomaly.detector.AnomalyDetector;
 import io.kontak.apps.anomaly.detector.TimeWindowAnomalyDetector;
-import io.kontak.apps.anomaly.detector.TimeWindowWithJoinAnomalyDetector;
 import io.kontak.apps.event.Anomaly;
 import io.kontak.apps.event.TemperatureReading;
 import org.junit.jupiter.api.Test;
@@ -17,7 +16,7 @@ public class TimeWindowAnomalyDetectorTest extends AbstractAnomalyDetectorTest {
 
     @Override
     protected AnomalyDetector createAnomalyDetector() {
-        return new TimeWindowWithJoinAnomalyDetector(
+        return new TimeWindowAnomalyDetector(
                 5.0,
                 Duration.ofSeconds(10),
                 Duration.ofMillis(500)
@@ -25,7 +24,7 @@ public class TimeWindowAnomalyDetectorTest extends AbstractAnomalyDetectorTest {
     }
 
     @Test
-    public void shouldAggregateRecords() {
+    public void shouldDetectAnomalies() {
         //given
         final String room1 = "room-1";
         final String thermometer1 = "thermometer-1";

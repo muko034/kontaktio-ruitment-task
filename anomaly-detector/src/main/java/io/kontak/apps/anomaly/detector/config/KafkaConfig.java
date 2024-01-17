@@ -3,6 +3,7 @@ package io.kontak.apps.anomaly.detector.config;
 import io.kontak.apps.anomaly.detector.AnomalyDetector;
 import io.kontak.apps.anomaly.detector.BooleanSerde;
 import io.kontak.apps.anomaly.detector.SumCount;
+import io.kontak.apps.anomaly.detector.SumCountTimestamp;
 import io.kontak.apps.anomaly.detector.TemperatureMeasurementsListener;
 import io.kontak.apps.event.Anomaly;
 import io.kontak.apps.event.TemperatureReading;
@@ -23,6 +24,7 @@ public class KafkaConfig {
     public static final JsonSerde<Anomaly> anomalySerde = new JsonSerde<>(Anomaly.class);
     public static final JsonSerde<TemperatureReading> temperatureReadingSerde = new JsonSerde<>(TemperatureReading.class);
     public static final JsonSerde<SumCount> sumCountSerde = new JsonSerde<>(SumCount.class);
+    public static final JsonSerde<SumCountTimestamp> sumCountTimestampSerde = new JsonSerde<>(SumCountTimestamp.class);
     public static final Serde<String> stringSerde = Serdes.String();
     public static final Serde<Double> doubleSerde = Serdes.Double();
     public static final Serde<Boolean> booleanSerde = new BooleanSerde();

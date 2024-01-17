@@ -1,24 +1,30 @@
 package io.kontak.apps.anomaly.detector;
 
+import io.kontak.apps.anomaly.detector.config.KafkaConfig;
 import io.kontak.apps.event.Anomaly;
 import io.kontak.apps.event.TemperatureReading;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Grouped;
+import org.apache.kafka.streams.kstream.JoinWindows;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.kstream.Named;
+import org.apache.kafka.streams.kstream.SlidingWindows;
+import org.apache.kafka.streams.kstream.StreamJoined;
+import org.apache.kafka.streams.kstream.WindowedSerdes;
+import org.apache.kafka.streams.state.WindowStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.support.serializer.JsonSerde;
+
+import java.time.Duration;
 
 public class CountWindowAnomalyDetector implements AnomalyDetector {
 
     private static final Logger logger = LoggerFactory.getLogger(CountWindowAnomalyDetector.class);
 
     private final double temperatureThreshold;
-    private final  int countWindowLimit;
+    private final int countWindowLimit;
 
     public CountWindowAnomalyDetector(double temperatureThreshold, int countWindowLimit) {
         this.temperatureThreshold = temperatureThreshold;
@@ -26,36 +32,55 @@ public class CountWindowAnomalyDetector implements AnomalyDetector {
     }
 
     @Override
-    public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) { // FIXME doesn't work as expected
-        JsonSerde<TemperatureReading> temperatureReadingJsonSerde = new JsonSerde<>(TemperatureReading.class);
-        JsonSerde<CountLimitedTemperatureAggregate> temperatureAggregateJsonSerde = new JsonSerde<>(CountLimitedTemperatureAggregate.class);
-        Serde<String> keySerde = Serdes.String();
-        return events
-                .groupByKey(Grouped.with(keySerde, temperatureReadingJsonSerde))
+    public KStream<String, Anomaly> apply(KStream<String, TemperatureReading> events) {
+        SlidingWindows timeSlidingWindows = SlidingWindows.ofTimeDifferenceWithNoGrace(Duration.ofHours(1)); // FIXME dummy implementation based on arbitrary (long) time window
+        KStream<String, SumCountTimestamp> sumCountTimestampStream = events
+                .groupByKey(Grouped.with(KafkaConfig.stringSerde, KafkaConfig.temperatureReadingSerde))
+                .windowedBy(timeSlidingWindows)
                 .aggregate(
-                        () -> CountLimitedTemperatureAggregate.empty(countWindowLimit),
-                        (key, temperatureReading, aggregate) -> aggregate.add(temperatureReading),
-                        Materialized.<String, CountLimitedTemperatureAggregate, KeyValueStore<Bytes, byte[]>>as(
+                        SumCountTimestamp::empty,
+                        (key, temperatureReading, aggregate) -> {
+                            if (aggregate != null && aggregate.count() < countWindowLimit) {
+                                return aggregate.add(temperatureReading.temperature(), temperatureReading.timestamp());
+                            } else {
+                                return null;
+                            }
+                        },
+                        Materialized.<String, SumCountTimestamp, WindowStore<Bytes, byte[]>>as(
                                         "count-window-temperature-aggregate-store"
                                 )
-                                .withKeySerde(keySerde)
-                                .withValueSerde(temperatureAggregateJsonSerde)
+                                .withKeySerde(KafkaConfig.stringSerde)
+                                .withValueSerde(KafkaConfig.sumCountTimestampSerde)
                 )
-                .mapValues((key, aggregate) -> {
-                    logger.info(String.format("Avg: %s, Aggregate: %s", aggregate.avgTemperatureAggregate().getAverage(), aggregate));
-                    return aggregate;
-                })
-                .filter((key, aggregate) -> aggregate.isTemperatureHigherThenAverageBy(temperatureThreshold))
-                .mapValues((key, aggregate) -> {
-                    TemperatureReading temperatureReading = aggregate.avgTemperatureAggregate().temperatureReading();
-                    return new Anomaly(
-                            temperatureReading.temperature(),
-                            temperatureReading.roomId(),
-                            temperatureReading.thermometerId(),
-                            temperatureReading.timestamp()
-                    );
-                })
-                .toStream();
+                .filter((key, aggregate) -> aggregate != null)
+                .toStream()
+                .map((key, value) -> new KeyValue<>(key.key(), value));
+        return events
+                .leftJoin(
+                        sumCountTimestampStream,
+                        (temperatureReading, sumCountTimestamp) -> {
+                            if (sumCountTimestamp != null
+                                    && !temperatureReading.timestamp().isAfter(sumCountTimestamp.timestamp())
+                                    && temperatureReading.temperature() > sumCountTimestamp.calcAvg() + temperatureThreshold) {
+                                return new Anomaly(
+                                        temperatureReading.temperature(),
+                                        temperatureReading.roomId(),
+                                        temperatureReading.thermometerId(),
+                                        temperatureReading.timestamp()
+                                );
+                            } else {
+                                return null;
+                            }
+                        },
+                        JoinWindows.ofTimeDifferenceWithNoGrace(Duration.ofMillis(timeSlidingWindows.timeDifferenceMs())),
+                        StreamJoined.with(
+                                KafkaConfig.stringSerde,
+                                KafkaConfig.temperatureReadingSerde,
+                                KafkaConfig.sumCountTimestampSerde
+                        )
+                )
+                .transform(DeduplicateAnomalyTransformer::new, Named.as("count-window-anomaly-transformer"), KafkaConfig.STATE_STORE_NAME)
+                .filter((key, anomaly) -> anomaly != null);
     }
 
 }

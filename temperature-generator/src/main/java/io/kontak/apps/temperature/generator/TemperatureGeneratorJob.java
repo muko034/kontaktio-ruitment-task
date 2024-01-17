@@ -16,7 +16,7 @@ public class TemperatureGeneratorJob {
         this.publisher = publisher;
     }
 
-    @Scheduled(fixedRateString = "${temperature-generator.rate.seconds}", timeUnit = TimeUnit.SECONDS)
+    @Scheduled(fixedRateString = "1", timeUnit = TimeUnit.SECONDS)
     public void generateDataAndSend() {
         generator.generate().forEach(publisher::publish);
     }
